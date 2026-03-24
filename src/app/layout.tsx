@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { ThemeProvider } from "next-themes";
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import { Toaster } from "react-hot-toast";
+import RootLayoutClient from "./layout-client";
 
 export const metadata: Metadata = {
   title: "Humor Flavor Manager",
@@ -17,13 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Navbar />
-          <main className="min-h-screen bg-white dark:bg-gray-950">
-            {children}
-          </main>
-          <Toaster />
-        </ThemeProvider>
+        <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
   );

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { isAdmin } from "@/lib/auth";
 import { updateHumorFlavorSchema } from "@/lib/validators";
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -21,7 +23,7 @@ export async function GET(
       humor_flavor_steps(*)
     `
     )
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) {
@@ -32,9 +34,10 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const isAdminUser = await isAdmin();
   if (!isAdminUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -60,7 +63,7 @@ export async function PUT(
         modified_by_user_id: session.user.id,
         modified_datetime_utc: new Date().toISOString(),
       })
-      .eq("id", params.id)
+      .eq("id", id)
       .select()
       .single();
 
@@ -78,9 +81,10 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const isAdminUser = await isAdmin();
   if (!isAdminUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -91,7 +95,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("humor_flavors")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+
+export const dynamic = "force-dynamic";
 
 interface TestImage {
   id: string;
@@ -19,7 +21,6 @@ interface Caption {
 
 export default function TestFlavorPage() {
   const params = useParams();
-  const router = useRouter();
   const [images, setImages] = useState<TestImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState("");
   const [captions, setCaptions] = useState<Caption[]>([]);

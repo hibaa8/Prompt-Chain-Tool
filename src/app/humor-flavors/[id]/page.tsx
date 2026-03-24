@@ -5,6 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
+export const dynamic = "force-dynamic";
+
 interface HumorFlavorStep {
   id: number;
   humor_flavor_id: number;

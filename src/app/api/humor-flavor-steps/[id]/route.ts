@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { isAdmin } from "@/lib/auth";
 import { updateHumorFlavorStepSchema, reorderStepSchema } from "@/lib/validators";
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const isAdminUser = await isAdmin();
   if (!isAdminUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +34,7 @@ export async function PUT(
       const { data: step, error: stepError } = await supabase
         .from("humor_flavor_steps")
         .select("humor_flavor_id, order_by")
-        .eq("id", params.id)
+        .eq("id", id)
         .single();
 
       if (stepError || !step) {
@@ -47,7 +49,7 @@ export async function PUT(
         .order("order_by");
 
       // Update order_by values
-      const updates = [];
+      const updates: Array<{ id: number; new_order: number }> = [];
       if (validated.from_order < validated.to_order) {
         // Moving down
         allSteps?.forEach((s) => {
@@ -56,7 +58,7 @@ export async function PUT(
               id: s.id,
               new_order: s.order_by - 1,
             });
-          } else if (s.id === parseInt(params.id)) {
+          } else if (s.id === parseInt(id)) {
             updates.push({
               id: s.id,
               new_order: validated.to_order,
@@ -71,7 +73,7 @@ export async function PUT(
               id: s.id,
               new_order: s.order_by + 1,
             });
-          } else if (s.id === parseInt(params.id)) {
+          } else if (s.id === parseInt(id)) {
             updates.push({
               id: s.id,
               new_order: validated.to_order,
@@ -105,7 +107,7 @@ export async function PUT(
         modified_by_user_id: session.user.id,
         modified_datetime_utc: new Date().toISOString(),
       })
-      .eq("id", params.id)
+      .eq("id", id)
       .select()
       .single();
 
@@ -123,9 +125,10 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const isAdminUser = await isAdmin();
   if (!isAdminUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -136,7 +139,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("humor_flavor_steps")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
