@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const origin = new URL(request.url).origin;
 
@@ -14,7 +13,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (error || !data?.url) {
-    return NextResponse.redirect(`${origin}/login`);
+    return NextResponse.redirect(`${origin}/login?error=oauth_start_failed`);
   }
 
   return NextResponse.redirect(data.url);

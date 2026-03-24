@@ -15,11 +15,7 @@ export async function GET(
     .from("humor_flavors")
     .select(
       `
-      id,
-      slug,
-      description,
-      created_datetime_utc,
-      modified_datetime_utc,
+      *,
       humor_flavor_steps(*)
     `
     )
@@ -55,17 +51,49 @@ export async function PUT(
   try {
     const body = await request.json();
     const validated = updateHumorFlavorSchema.parse(body);
-
-    const { data, error } = await supabase
-      .from("humor_flavors")
-      .update({
-        ...validated,
+    const nowIso = new Date().toISOString();
+    const candidates: Array<Record<string, unknown>> = [
+      {
+        name: validated.name,
+        description: validated.description,
         modified_by_user_id: session.user.id,
-        modified_datetime_utc: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
+        modified_datetime_utc: nowIso,
+      },
+      {
+        slug: validated.name,
+        description: validated.description,
+        modified_by_user_id: session.user.id,
+        modified_datetime_utc: nowIso,
+      },
+      {
+        name: validated.name,
+        description: validated.description,
+        modified_datetime_utc: nowIso,
+      },
+      {
+        slug: validated.name,
+        description: validated.description,
+        modified_datetime_utc: nowIso,
+      },
+    ];
+
+    let data: unknown = null;
+    let error: { message: string } | null = null;
+
+    for (const payload of candidates) {
+      const result = await supabase
+        .from("humor_flavors")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (!result.error) {
+        data = result.data;
+        error = null;
+        break;
+      }
+      error = { message: result.error.message };
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

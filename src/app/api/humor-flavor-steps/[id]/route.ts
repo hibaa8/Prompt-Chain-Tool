@@ -4,6 +4,26 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { isAdmin } from "@/lib/auth";
 import { updateHumorFlavorStepSchema, reorderStepSchema } from "@/lib/validators";
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("humor_flavor_steps")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+
+  return NextResponse.json({ data });
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,11 +36,11 @@ export async function PUT(
 
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No session" }, { status: 401 });
+  if (!user?.id) {
+    return NextResponse.json({ error: "No authenticated user" }, { status: 401 });
   }
 
   try {
@@ -84,14 +104,24 @@ export async function PUT(
 
       // Apply updates
       for (const update of updates) {
-        await supabase
+        const updateWithAudit = await supabase
           .from("humor_flavor_steps")
           .update({
             order_by: update.new_order,
-            modified_by_user_id: session.user.id,
+            modified_by_user_id: user.id,
             modified_datetime_utc: new Date().toISOString(),
           })
           .eq("id", update.id);
+
+        if (updateWithAudit.error?.message?.includes("modified_by_user_id")) {
+          await supabase
+            .from("humor_flavor_steps")
+            .update({
+              order_by: update.new_order,
+              modified_datetime_utc: new Date().toISOString(),
+            })
+            .eq("id", update.id);
+        }
       }
 
       return NextResponse.json({ success: true });
@@ -100,16 +130,36 @@ export async function PUT(
     // Regular update
     const validated = updateHumorFlavorStepSchema.parse(body);
 
-    const { data, error } = await supabase
-      .from("humor_flavor_steps")
-      .update({
+    const nowIso = new Date().toISOString();
+    const candidates: Array<Record<string, unknown>> = [
+      {
         ...validated,
-        modified_by_user_id: session.user.id,
-        modified_datetime_utc: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
+        modified_by_user_id: user.id,
+        modified_datetime_utc: nowIso,
+      },
+      {
+        ...validated,
+        modified_datetime_utc: nowIso,
+      },
+    ];
+
+    let data: unknown = null;
+    let error: { message: string } | null = null;
+
+    for (const payload of candidates) {
+      const result = await supabase
+        .from("humor_flavor_steps")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (!result.error) {
+        data = result.data;
+        error = null;
+        break;
+      }
+      error = { message: result.error.message };
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

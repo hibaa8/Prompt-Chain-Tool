@@ -18,7 +18,8 @@ interface HumorFlavorStep {
 
 interface HumorFlavor {
   id: number;
-  slug: string;
+  name?: string;
+  slug?: string;
   description?: string;
   humor_flavor_steps: HumorFlavorStep[];
 }
@@ -27,20 +28,24 @@ export default function EditFlavorPage() {
   const params = useParams();
   const router = useRouter();
   const [flavor, setFlavor] = useState<HumorFlavor | null>(null);
-  const [slug, setSlug] = useState("");
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const fetchFlavor = async () => {
+    const response = await fetch(`/api/humor-flavors/${params.id}`);
+    if (!response.ok) throw new Error("Failed to fetch");
+    const { data } = await response.json();
+    setFlavor(data);
+    setName(data.name || data.slug || "");
+    setDescription(data.description || "");
+  };
+
   useEffect(() => {
-    const fetchFlavor = async () => {
+    const load = async () => {
       try {
-        const response = await fetch(`/api/humor-flavors/${params.id}`);
-        if (!response.ok) throw new Error("Failed to fetch");
-        const { data } = await response.json();
-        setFlavor(data);
-        setSlug(data.slug);
-        setDescription(data.description || "");
+        await fetchFlavor();
       } catch (err) {
         toast.error("Failed to load flavor");
         router.push("/");
@@ -49,7 +54,7 @@ export default function EditFlavorPage() {
       }
     };
 
-    fetchFlavor();
+    load();
   }, [params.id, router]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -60,7 +65,7 @@ export default function EditFlavorPage() {
       const response = await fetch(`/api/humor-flavors/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, description }),
+        body: JSON.stringify({ name, description }),
       });
 
       if (!response.ok) {
@@ -94,6 +99,27 @@ export default function EditFlavorPage() {
     }
   };
 
+  const handleReorderStep = async (stepId: number, fromOrder: number, toOrder: number) => {
+    try {
+      const response = await fetch(`/api/humor-flavor-steps/${stepId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_order: fromOrder, to_order: toOrder }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.error || "Failed to reorder step");
+        return;
+      }
+
+      await fetchFlavor();
+      toast.success("Step order updated");
+    } catch {
+      toast.error("Error reordering step");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -121,12 +147,12 @@ export default function EditFlavorPage() {
         <form onSubmit={handleSave} className="lg:col-span-1 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-800">
           <div className="mb-6">
             <label className="block text-gray-700 dark:text-gray-300 font-bold mb-2">
-              Flavor Slug
+              Name
             </label>
             <input
               type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
               className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
             />
@@ -186,7 +212,7 @@ export default function EditFlavorPage() {
             <div className="space-y-4">
               {flavor.humor_flavor_steps
                 .sort((a, b) => a.order_by - b.order_by)
-                .map((step) => (
+                .map((step, index, sortedSteps) => (
                   <div
                     key={step.id}
                     className="bg-white dark:bg-gray-900 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-800"
@@ -200,12 +226,42 @@ export default function EditFlavorPage() {
                           {step.description || "No description"}
                         </p>
                       </div>
-                      <Link
-                        href={`/humor-flavors/${params.id}/steps/${step.id}/edit`}
-                        className="text-blue-600 hover:text-blue-700 font-bold"
-                      >
-                        Edit
-                      </Link>
+                      <div className="flex gap-2 items-center">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() =>
+                            handleReorderStep(
+                              step.id,
+                              step.order_by,
+                              sortedSteps[index - 1].order_by
+                            )
+                          }
+                          className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50"
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === sortedSteps.length - 1}
+                          onClick={() =>
+                            handleReorderStep(
+                              step.id,
+                              step.order_by,
+                              sortedSteps[index + 1].order_by
+                            )
+                          }
+                          className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50"
+                        >
+                          Down
+                        </button>
+                        <Link
+                          href={`/humor-flavors/${params.id}/steps/${step.id}/edit`}
+                          className="text-blue-600 hover:text-blue-700 font-bold"
+                        >
+                          Edit
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 ))}

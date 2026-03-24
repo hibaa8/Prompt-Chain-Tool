@@ -1,7 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createServerClient, serializeCookieHeader, parseCookieHeader } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
+
+const supabaseAnonKey =
+  process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseProjectId = process.env.SUPABASE_PROJECT_ID;
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  (supabaseProjectId ? `https://${supabaseProjectId}.supabase.co` : undefined);
 
 export async function middleware(request: NextRequest) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.next();
+  }
+
   const { pathname } = request.nextUrl;
 
   // Public routes
@@ -10,30 +22,30 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected routes
-  const response = NextResponse.next();
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return parseCookieHeader(request.headers.get("cookie") ?? "");
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
@@ -42,7 +54,7 @@ export async function middleware(request: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_superadmin, is_matrix_admin")
-    .eq("id", session.user.id)
+    .eq("id", user.id)
     .single();
 
   const isAdmin = profile?.is_superadmin || profile?.is_matrix_admin;

@@ -15,7 +15,7 @@ export default async function Dashboard() {
 
   const { data: flavors, error } = await supabase
     .from("humor_flavors")
-    .select("id, slug, description, created_datetime_utc")
+    .select("*")
     .order("created_datetime_utc", { ascending: false });
 
   if (error) {
@@ -50,7 +50,7 @@ export default async function Dashboard() {
               className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-800"
             >
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                {flavor.slug}
+                {flavor.name || flavor.slug || `Flavor #${flavor.id}`}
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 {flavor.description || "No description"}

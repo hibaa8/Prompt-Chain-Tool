@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default function NewFlavorPage() {
   const router = useRouter();
-  const [slug, setSlug] = useState("");
+  const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,7 @@ export default function NewFlavorPage() {
       const response = await fetch("/api/humor-flavors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, description }),
+        body: JSON.stringify({ name, description }),
       });
 
       if (!response.ok) {
@@ -49,13 +49,13 @@ export default function NewFlavorPage() {
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-800">
         <div className="mb-6">
           <label className="block text-gray-700 dark:text-gray-300 font-bold mb-2">
-            Flavor Slug
+            Name
           </label>
           <input
             type="text"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            placeholder="e.g., nature-documentary"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Nature Documentary"
             required
             className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-blue-500"
           />
@@ -63,7 +63,7 @@ export default function NewFlavorPage() {
 
         <div className="mb-6">
           <label className="block text-gray-700 dark:text-gray-300 font-bold mb-2">
-            Description (optional)
+            Description
           </label>
           <textarea
             value={description}
