@@ -61,6 +61,10 @@ export async function POST(request: Request) {
       payload = { error: text || "Unexpected non-JSON response from caption API." };
     }
 
+    if (!response.ok) {
+      console.error(`[generate-captions] Upstream error ${response.status}:`, payload);
+    }
+
     if (!response.ok && response.status >= 500) {
       return NextResponse.json(
         {
@@ -74,6 +78,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(payload, { status: response.status });
   } catch (error) {
+    console.error("[generate-captions] Unexpected error:", error);
     return NextResponse.json(
       { error: "Failed to generate captions. Network or upstream error." },
       { status: 502 }
