@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("captions")
-    .select("id, content, humor_flavor_id, image_id, created_datetime_utc")
+    .select("id, content, humor_flavor_id, image_id, created_datetime_utc, images(id, url, image_description)")
     .order("created_datetime_utc", { ascending: false });
 
   if (humorFlavorId) {
