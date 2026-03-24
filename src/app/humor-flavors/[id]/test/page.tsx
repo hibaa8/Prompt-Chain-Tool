@@ -112,19 +112,13 @@ export default function TestFlavorPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        const detail =
-          error?.upstream?.error ||
-          error?.upstream?.message ||
-          (typeof error?.upstream === "string" ? error.upstream : "");
-        const elapsed =
-          typeof error?.elapsedMs === "number"
-            ? ` (${Math.round(error.elapsedMs / 1000)}s)`
-            : "";
-        toast.error(
-          detail
-            ? `${error.error || "Failed to generate captions"}: ${detail}${elapsed}`
-            : `${error.error || "Failed to generate captions"}${elapsed}`
-        );
+        const message =
+          typeof error?.message === "string"
+            ? error.message
+            : typeof error?.error === "string"
+            ? error.error
+            : "Failed to generate captions";
+        toast.error(message);
         return;
       }
 

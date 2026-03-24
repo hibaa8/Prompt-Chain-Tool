@@ -4,7 +4,6 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function POST(request: Request) {
   try {
-    const startedAt = Date.now();
     const { imageId, humorFlavorId } = (await request.json()) as {
       imageId?: string;
       humorFlavorId?: number;
@@ -23,33 +22,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing access token." }, { status: 401 });
     }
 
-    const makeRequest = (includeFlavorId: boolean) =>
-      almostCrackdFetch(
-        "/pipeline/generate-captions",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            imageId,
-            ...(includeFlavorId && typeof humorFlavorId === "number"
-              ? { humorFlavorId }
-              : {}),
-          }),
-        },
-        session.access_token
-      );
-
-    let response = await makeRequest(true);
-
-    // Backward compatibility: older API versions may reject humorFlavorId.
-    // Retry without it only for request-shape errors, not upstream outages.
-    const shouldRetryWithoutFlavorId =
-      !response.ok &&
-      typeof humorFlavorId === "number" &&
-      [400, 401, 404, 422].includes(response.status);
-
-    if (shouldRetryWithoutFlavorId) {
-      response = await makeRequest(false);
+    const body: Record<string, unknown> = { imageId };
+    if (typeof humorFlavorId === "number") {
+      body.humorFlavorId = humorFlavorId;
     }
+
+    const response = await almostCrackdFetch(
+      "/pipeline/generate-captions",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      session.access_token
+    );
 
     const contentType = response.headers.get("content-type") || "";
     let payload: unknown;
@@ -63,17 +48,6 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       console.error(`[generate-captions] Upstream error ${response.status}:`, payload);
-    }
-
-    if (!response.ok && response.status >= 500) {
-      return NextResponse.json(
-        {
-          error: `Caption API unavailable (${response.status}). Please try again.`,
-          upstream: payload,
-          elapsedMs: Date.now() - startedAt,
-        },
-        { status: response.status }
-      );
     }
 
     return NextResponse.json(payload, { status: response.status });
