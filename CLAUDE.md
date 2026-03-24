@@ -2,196 +2,119 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-**Humor Flavor Manager** — A Next.js admin dashboard for superadmins and matrix admins to manage humor flavor configurations and test caption generation via the REST API (api.almostcrackd.ai).
-
-### Key Features
-- Create, read, update, delete humor flavors
-- Manage humor flavor steps (reorder, edit, delete)
-- Test flavor configurations with real images
-- Dark/light/system theme support
-- Supabase authentication with role-based access control
-
 ## Commands
 
-### Development
 ```bash
-npm run dev        # Start dev server on http://localhost:3000
-npm run build      # Production build
-npm start          # Run production server
-npm run lint       # Run ESLint
+npm run dev        # Start dev server — http://localhost:3000
+npm run build      # Production build (must pass before pushing)
+npm run lint       # ESLint
+npm start          # Run production build
 ```
 
-### Database & Auth
-- All data stored in Supabase (project: qihsgnfjqmkjmoowyfbn)
-- Auth: Google OAuth with Supabase
-- Protected routes: Middleware checks `is_superadmin` OR `is_matrix_admin` from profiles table
+**Always run `npm run build` locally and confirm it succeeds before committing or pushing.**
 
 ## Architecture
 
-### Tech Stack
-- **Framework**: Next.js 15 with TypeScript
-- **Styling**: Tailwind CSS with dark mode (next-themes)
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase + Google OAuth
-- **API Client**: Custom almostCrackdClient for api.almostcrackd.ai
-- **Validation**: Zod for request schemas
-- **Notifications**: react-hot-toast
+**Next.js 15 admin dashboard** for managing humor flavor configurations. Superadmins and matrix admins only.
 
-### File Structure
-```
-src/
-├── app/
-│   ├── layout.tsx              # Root layout with ThemeProvider
-│   ├── page.tsx                # Dashboard (list humor flavors)
-│   ├── globals.css             # Tailwind styles
-│   ├── login/page.tsx          # Google OAuth login
-│   ├── unauthorized/page.tsx   # 403 page for non-admins
-│   ├── components/
-│   │   └── Navbar.tsx          # Top nav with theme toggle + logout
-│   ├── auth/
-│   │   ├── callback/route.ts   # OAuth callback handler
-│   │   └── logout/route.ts     # Sign out endpoint
-│   ├── humor-flavors/
-│   │   ├── new/page.tsx        # Create new flavor
-│   │   ├── [id]/page.tsx       # Edit flavor + list steps
-│   │   ├── [id]/test/page.tsx  # Test flavor (generate captions)
-│   │   └── [id]/steps/new/page.tsx   # Add step (stub)
-│   └── api/
-│       ├── humor-flavors/
-│       │   ├── route.ts        # GET all, POST create
-│       │   └── [id]/route.ts   # GET, PUT, DELETE single flavor
-│       ├── humor-flavor-steps/
-│       │   ├── route.ts        # POST create step
-│       │   └── [id]/route.ts   # PUT (update/reorder), DELETE step
-│       ├── pipeline/
-│       │   └── generate-captions/route.ts  # POST to almostCrackd API
-│       ├── images/route.ts     # GET test images (is_common_use=true)
-│       └── captions/route.ts   # GET captions by humor_flavor_id
-├── lib/
-│   ├── almostCrackdClient.ts   # Fetch wrapper with Bearer auth
-│   ├── supabaseClient.ts       # Client-side Supabase instance
-│   ├── supabaseServer.ts       # Server-side Supabase (SSR)
-│   ├── auth.ts                 # Auth helpers (isAdmin, getCurrentUser)
-│   └── validators.ts           # Zod schemas for API requests
-└── middleware.ts               # Auth protection + admin check
-```
+### Stack
+- **Next.js 15** with App Router, TypeScript
+- **Supabase** — auth (Google OAuth) + database (PostgreSQL)
+- **@supabase/ssr** — server-side Supabase with cookie-based sessions
+- **Tailwind CSS** + **next-themes** (dark/light/system)
+- **Zod** — request validation
+- **react-hot-toast** — notifications
+- **api.almostcrackd.ai** — external REST API for caption generation
 
-## Key Implementation Details
+### Environment Variables
 
-### Authentication Flow
-1. Unauthenticated users → redirected to `/login`
-2. Login page → Google OAuth via Supabase
-3. Callback handler (`/auth/callback`) → exchanges code for session
-4. Middleware checks: Is authenticated? Is admin? If not → redirect
-5. Logout endpoint clears session and redirects to `/login`
-
-### Humor Flavor Data Model
-- **humor_flavors**: slug (unique), description, created/modified timestamps
-- **humor_flavor_steps**: Ordered steps (order_by field) with LLM config
-  - Each step references: llm_model_id, llm_input_type_id, llm_output_type_id, humor_flavor_step_type_id
-  - Contains: system_prompt, user_prompt, temperature
-- **captions**: Generated captions linked to humor_flavor_id + image_id
-
-### API Integration with almostCrackd
-- All requests use `almostCrackdClient.ts` which:
-  - Prepends `https://api.almostcrackd.ai` to path
-  - Adds Bearer token from Supabase session
-  - Sets `Content-Type: application/json`
-- Endpoint `/pipeline/generate-captions` accepts `{imageId: string}`
-- Response includes generated captions
-
-### Step Reordering Logic
-- Steps stored with `order_by` smallint field
-- Reorder endpoint (`PUT /api/humor-flavor-steps/[id]`) handles:
-  - Detect move direction (up/down)
-  - Shift intermediate steps' order_by values
-  - Update target step to new position
-  - All updates within same flavor
-
-### Dark Mode
-- Uses `next-themes` with `ThemeProvider` in root layout
-- Tailwind `darkMode: "class"` in config
-- Theme toggle in Navbar (stores preference in localStorage)
-- System preference as default
-
-## Database Tables (from database.md)
-
-### Core Tables
-- **profiles**: is_superadmin, is_matrix_admin flags
-- **humor_flavors**: id, slug (unique), description, created_by_user_id, modified_by_user_id, timestamps
-- **humor_flavor_steps**: id, humor_flavor_id, order_by, llm prompts, temperature, model/type references
-- **humor_flavor_step_types**: Available step type definitions
-- **llm_models**: Available LLM models to choose from
-- **llm_input_types**: Input type options (e.g., image, text)
-- **llm_output_types**: Output type options (e.g., text, json)
-- **images**: Test images (is_common_use=true for admin testing)
-- **captions**: Generated captions with humor_flavor_id, image_id, text
-
-## Environment Variables
+The app reads from `.env` (already present, not committed). Both prefixed and unprefixed names are supported:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://secure.almostcrackd.ai
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<from .env>
-SUPABASE_PROJECT_ID=qihsgnfjqmkjmoowyfbn
-NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=388960353527-fh4grc6mla425lg0e3g1hh67omtrdihd.apps.googleusercontent.com
+SUPABASE_URL  (or NEXT_PUBLIC_SUPABASE_URL)
+SUPABASE_ANON_KEY  (or NEXT_PUBLIC_SUPABASE_ANON_KEY)
+SUPABASE_PROJECT_ID
+GOOGLE_OAUTH_CLIENT_ID  (or NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID)
 ```
 
-(VERCEL_URL auto-set by Vercel for production deployment)
+### Auth Flow
 
-## Testing & Development
+1. `/login` → link to `/auth/signin`
+2. `/auth/signin` — calls `supabase.auth.signInWithOAuth({ provider: "google" })` → redirects to Google
+3. `/auth/callback` — `exchangeCodeForSession(code)`, checks `profiles.is_superadmin || profiles.is_matrix_admin`, redirects to `/` or `/unauthorized`
+4. `middleware.ts` — runs on every non-static request; calls `supabase.auth.getUser()` and checks profile flags; redirects to `/login` or `/unauthorized`
+5. `/auth/logout` — signs out, redirects to `/`
 
-### Manual Testing
-1. **Auth**: `npm run dev` → visit http://localhost:3000 → redirects to login → sign in with Google
-2. **Dashboard**: View all flavors, create new, edit, delete
-3. **Testing**: Select image → click "Test" → calls `/api/pipeline/generate-captions`
-4. **Theme**: Toggle sun/moon icon to test dark/light mode
+**Access control:** `profiles.is_superadmin` OR `profiles.is_matrix_admin` must be `true`. Checked in both middleware and `/auth/callback`.
 
-### API Testing
-```bash
-# Create flavor
-curl -X POST http://localhost:3000/api/humor-flavors \
-  -H "Content-Type: application/json" \
-  -d '{"slug":"test-flavor","description":"Test"}'
+### Key File Relationships
 
-# Get flavor with steps
-curl http://localhost:3000/api/humor-flavors/1
-
-# Generate captions
-curl -X POST http://localhost:3000/api/pipeline/generate-captions \
-  -H "Content-Type: application/json" \
-  -d '{"imageId":"<image-uuid>"}'
+```
+middleware.ts                    # Auth gate for all routes
+src/lib/
+  supabaseServer.ts             # createSupabaseServerClient() — used in API routes + server pages
+  supabaseClient.ts             # Client-side supabase instance (browser)
+  almostCrackdClient.ts         # almostCrackdFetch() — wraps fetch with Bearer token
+  auth.ts                       # isAdmin() helper for API route guards
+  validators.ts                 # Zod schemas (createHumorFlavorSchema uses `name` field, maps to `slug` column)
+src/app/
+  layout.tsx                    # Server layout (exports metadata)
+  layout-client.tsx             # "use client" — ThemeProvider + Navbar + Toaster
+  page.tsx                      # Dashboard: lists all humor_flavors
+  humor-flavors/
+    new/page.tsx                # Create flavor (POSTs `name` + `description`)
+    [id]/page.tsx               # Edit flavor + list/reorder steps
+    [id]/steps/new/page.tsx     # Add step — fetches /api/humor-flavor-steps/options for dropdowns
+    [id]/steps/[stepId]/edit/   # Edit existing step
+    [id]/test/page.tsx          # Test flavor: pick image → generate captions via API
+  api/
+    humor-flavors/route.ts      # GET all, POST create
+    humor-flavors/[id]/route.ts # GET (with steps), PUT, DELETE
+    humor-flavor-steps/route.ts # POST create step
+    humor-flavor-steps/[id]/route.ts  # GET, PUT (update or reorder), DELETE
+    humor-flavor-steps/options/route.ts  # GET llm_models, llm_input_types, llm_output_types, step_types
+    pipeline/generate-captions/route.ts  # POST → almostCrackdFetch → /pipeline/generate-captions
+    images/route.ts             # GET images where is_common_use=true
+    captions/route.ts           # GET captions, optional ?humor_flavor_id=
 ```
 
-## Known Limitations & TODO
+### Database Schema (relevant tables — read-only, never modify schema)
 
-- **Step Creation/Editing**: UI is stubbed. Needs to:
-  - Fetch available llm_models, llm_input_types, llm_output_types from Supabase
-  - Allow selection of these fields
-  - Full CRUD for steps (edit page not yet built)
-- **Drag-Drop Reordering**: Step list shows order but no drag UI. Can use arrow buttons or reorder API directly.
-- **Captions Display**: Test results show generated captions but no filtering/export yet.
+Only INSERT/UPDATE/DELETE rows. Never CREATE/DROP/ALTER tables.
 
-## References from Week1 Project
+- **humor_flavors** — `id`, `slug` (unique), `description`, `created_by_user_id`, `modified_by_user_id`, timestamps
+- **humor_flavor_steps** — `id`, `humor_flavor_id`, `order_by` (smallint), `llm_system_prompt`, `llm_user_prompt`, `llm_temperature`, `llm_model_id`, `llm_input_type_id`, `llm_output_type_id`, `humor_flavor_step_type_id`, `description`
+- **profiles** — `id` (= auth.users.id), `is_superadmin` (bool), `is_matrix_admin` (bool)
+- **images** — `id` (uuid), `url`, `image_description`, `is_common_use`
+- **captions** — `id`, `content`, `humor_flavor_id`, `image_id`
+- **llm_models**, **llm_input_types**, **llm_output_types**, **humor_flavor_step_types** — lookup tables for step config
 
-This project reuses patterns from `/Users/admin/Documents/humor-project/HumorProject-Week1`:
-- `almostCrackdClient.ts`: API client with Bearer auth pattern
-- `supabaseClient.ts` / `supabaseServer.ts`: Supabase setup for client/server
-- Auth callback flow for Google OAuth
-- API route patterns for Supabase CRUD
-- Middleware auth protection
+### `humor_flavors` name vs slug
 
-## Deploy to Vercel
+The DB column is `slug`. The UI/validator uses `name`. API routes try inserting with `name` first, then fall back to `slug` if the column doesn't exist. Keep this fallback pattern when updating those routes.
 
-1. Push to GitHub
-2. Import repo in Vercel
-3. Set env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
-4. Build & deploy
-5. Update OAuth redirect URI in Google Console to Vercel URL
+### Step Reorder Logic
 
----
+`PUT /api/humor-flavor-steps/[id]` with `{ from_order, to_order }` triggers reorder. It shifts all intermediate steps' `order_by` values and sets the target step's new position. All other PUT calls are treated as regular field updates.
 
-**Last Updated**: 2026-03-24
-**Author**: Claude Code
-**Version**: 0.1.0 (MVP - dashboard, flavor CRUD, caption testing)
+### Caption Generation
+
+`POST /api/pipeline/generate-captions` accepts `{ imageId, humorFlavorId? }`. Calls `almostCrackdFetch("/pipeline/generate-captions", ...)` with the user's Supabase Bearer token. If `humorFlavorId` causes a 400/422, it retries without it. The test page uses `normalizeGeneratedCaptions()` to handle varying response shapes from the API.
+
+### Important Patterns
+
+- All API routes that mutate data call `isAdmin()` first (from `src/lib/auth.ts`)
+- `supabaseServer.ts` reads both `SUPABASE_*` and `NEXT_PUBLIC_SUPABASE_*` env names — don't change this
+- Dynamic client pages (with hooks) export `export const dynamic = "force-dynamic"` to prevent static generation errors
+- The root layout is split: `layout.tsx` (server, exports `metadata`) imports `layout-client.tsx` (`"use client"`, wraps children in ThemeProvider)
+- API routes use Next.js 15 `params: Promise<{ id: string }>` — always `await params` before using `id`
+
+### Vercel Deployment
+
+Set these env vars in Vercel project settings (copy from `.env`):
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_PROJECT_ID`
+- `GOOGLE_OAUTH_CLIENT_ID`
+
+After deploy, add the Vercel domain to Google OAuth authorized redirect URIs: `https://<your-app>.vercel.app/auth/callback`
