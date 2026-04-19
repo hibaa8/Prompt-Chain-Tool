@@ -186,6 +186,12 @@ export default function EditFlavorPage() {
               Delete Flavor
             </button>
             <Link
+              href={`/humor-flavors/${params.id}/duplicate`}
+              className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-lg transition text-center"
+            >
+              Duplicate…
+            </Link>
+            <Link
               href="/"
               className="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition text-center"
             >

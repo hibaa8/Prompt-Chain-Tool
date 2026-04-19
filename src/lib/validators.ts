@@ -7,6 +7,11 @@ export const createHumorFlavorSchema = z.object({
 
 export const updateHumorFlavorSchema = createHumorFlavorSchema;
 
+/** New display name for a duplicated flavor (must be unique in your DB). */
+export const duplicateHumorFlavorSchema = z.object({
+  name: z.string().min(1, "Name is required").max(500),
+});
+
 export const createHumorFlavorStepSchema = z.object({
   humor_flavor_id: z.number().positive(),
   order_by: z.number().int().min(0),
@@ -29,6 +34,7 @@ export const reorderStepSchema = z.object({
 
 export type CreateHumorFlavorInput = z.infer<typeof createHumorFlavorSchema>;
 export type UpdateHumorFlavorInput = z.infer<typeof updateHumorFlavorSchema>;
+export type DuplicateHumorFlavorInput = z.infer<typeof duplicateHumorFlavorSchema>;
 export type CreateHumorFlavorStepInput = z.infer<typeof createHumorFlavorStepSchema>;
 export type UpdateHumorFlavorStepInput = z.infer<typeof updateHumorFlavorStepSchema>;
 export type ReorderStepInput = z.infer<typeof reorderStepSchema>;
