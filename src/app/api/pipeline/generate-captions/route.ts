@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { almostCrackdFetch } from "@/lib/almostCrackdClient";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  readCaptionApiBody,
+  upstreamMessage,
+  isCaptionsArrayMapUpstreamBug,
+  withCaptionErrorHint,
+} from "@/lib/captionApiHelpers";
 
 export async function POST(request: Request) {
   try {
@@ -22,35 +28,53 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing access token." }, { status: 401 });
     }
 
-    const body: Record<string, unknown> = { imageId };
-    if (typeof humorFlavorId === "number") {
-      body.humorFlavorId = humorFlavorId;
+    const flavorId =
+      typeof humorFlavorId === "number" && Number.isFinite(humorFlavorId)
+        ? humorFlavorId
+        : undefined;
+
+    const primary: Record<string, unknown> = { imageId };
+    if (flavorId != null) {
+      primary.humorFlavorId = flavorId;
     }
 
-    const response = await almostCrackdFetch(
-      "/pipeline/generate-captions",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-      session.access_token
-    );
+    const doUpstream = (body: Record<string, unknown>) =>
+      almostCrackdFetch(
+        "/pipeline/generate-captions",
+        { method: "POST", body: JSON.stringify(body) },
+        session.access_token
+      );
 
-    const contentType = response.headers.get("content-type") || "";
-    let payload: unknown;
+    let response = await doUpstream(primary);
+    let payload = await readCaptionApiBody(response);
 
-    if (contentType.includes("application/json")) {
-      payload = await response.json();
-    } else {
-      const text = await response.text();
-      payload = { error: text || "Unexpected non-JSON response from caption API." };
+    if (
+      !response.ok &&
+      response.status === 500 &&
+      flavorId != null &&
+      isCaptionsArrayMapUpstreamBug(upstreamMessage(payload))
+    ) {
+      response = await doUpstream({ imageId, humor_flavor_id: flavorId });
+      payload = await readCaptionApiBody(response);
     }
+
+    if (
+      !response.ok &&
+      response.status === 500 &&
+      flavorId != null &&
+      isCaptionsArrayMapUpstreamBug(upstreamMessage(payload))
+    ) {
+      response = await doUpstream({ imageId });
+      payload = await readCaptionApiBody(response);
+    }
+
+    const out = withCaptionErrorHint(payload, response.status);
 
     if (!response.ok) {
-      console.error(`[generate-captions] Upstream error ${response.status}:`, payload);
+      console.error(`[generate-captions] Upstream error ${response.status}:`, out);
     }
 
-    return NextResponse.json(payload, { status: response.status });
+    return NextResponse.json(out, { status: response.status });
   } catch (error) {
     console.error("[generate-captions] Unexpected error:", error);
     return NextResponse.json(

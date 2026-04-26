@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { normalizeGeneratedCaptions, type GeneratedCaption } from "@/lib/normalizeGeneratedCaptions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,49 +14,7 @@ interface TestImage {
   image_description?: string;
 }
 
-interface Caption {
-  id: string;
-  content?: string;
-  text?: string;
-  humor_flavor_id: number;
-}
-
-function normalizeGeneratedCaptions(payload: any): Caption[] {
-  const candidates =
-    payload?.data ??
-    payload?.captions ??
-    payload?.generatedCaptions ??
-    payload?.result?.captions ??
-    payload?.result ??
-    payload;
-
-  if (!Array.isArray(candidates)) {
-    return [];
-  }
-
-  return candidates
-    .map((item: any, idx: number) => {
-      if (typeof item === "string") {
-        return {
-          id: `generated-${idx}`,
-          text: item,
-          humor_flavor_id: Number(payload?.humorFlavorId ?? 0),
-        };
-      }
-
-      if (item && typeof item === "object") {
-        return {
-          id: String(item.id ?? `generated-${idx}`),
-          text: item.text ?? item.content ?? item.caption ?? item.generated_caption,
-          content: item.content ?? item.text ?? item.caption ?? item.generated_caption,
-          humor_flavor_id: Number(item.humor_flavor_id ?? payload?.humorFlavorId ?? 0),
-        };
-      }
-
-      return null;
-    })
-    .filter((item: Caption | null) => !!item && !!(item.text || item.content)) as Caption[];
-}
+type Caption = GeneratedCaption;
 
 export default function TestFlavorPage() {
   const params = useParams();
@@ -119,6 +78,9 @@ export default function TestFlavorPage() {
             ? error.error
             : "Failed to generate captions";
         toast.error(message);
+        if (typeof error?.hint === "string" && error.hint) {
+          toast(error.hint, { icon: "ℹ️", duration: 12000 });
+        }
         return;
       }
 
