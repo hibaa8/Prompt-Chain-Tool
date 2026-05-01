@@ -9,6 +9,13 @@ import { createMockSupabase, mockSession } from "../../helpers/supabaseMock";
 const mockCreateClient = jest.mocked(createSupabaseServerClient);
 const mockAlmostCrackdFetch = jest.mocked(almostCrackdFetch);
 
+/** Mock client with insert that resolves (persist path calls from('captions').insert). */
+function createSupabaseForGenerateCaptions() {
+  const supabase = createMockSupabase();
+  supabase._chain.insert = jest.fn().mockResolvedValue({ data: null, error: null });
+  return supabase;
+}
+
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/pipeline/generate-captions", {
     method: "POST",
@@ -28,7 +35,7 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("POST /api/pipeline/generate-captions", () => {
   it("returns 400 when imageId is missing", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
 
@@ -40,7 +47,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("returns 401 when session has no access token", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
     mockCreateClient.mockResolvedValue(supabase as any);
 
@@ -49,7 +56,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("returns upstream response on success without flavorId", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -64,8 +71,42 @@ describe("POST /api/pipeline/generate-captions", () => {
     expect(mockAlmostCrackdFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("inserts generated captions into the database when upstream succeeds", async () => {
+    const supabase = createSupabaseForGenerateCaptions();
+    supabase.auth.getSession.mockResolvedValue(mockSession("user-persist", "tok") as any);
+    mockCreateClient.mockResolvedValue(supabase as any);
+    mockAlmostCrackdFetch.mockResolvedValue(
+      makeUpstreamResponse({ data: ["One", { content: "Two" }] })
+    );
+
+    const res = await POST(
+      makeRequest({ imageId: "img-uuid", humorFlavorId: 9 })
+    );
+    expect(res.status).toBe(200);
+
+    expect(supabase.from).toHaveBeenCalledWith("captions");
+    expect(supabase._chain.insert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        content: "One",
+        image_id: "img-uuid",
+        humor_flavor_id: 9,
+        profile_id: "user-persist",
+        created_by_user_id: "user-persist",
+        modified_by_user_id: "user-persist",
+        is_public: true,
+      }),
+      expect.objectContaining({
+        content: "Two",
+        image_id: "img-uuid",
+        humor_flavor_id: 9,
+        profile_id: "user-persist",
+        is_public: true,
+      }),
+    ]);
+  });
+
   it("includes humorFlavorId in upstream request when provided", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -80,7 +121,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("retries with humor_flavor_id field on captionsAsArray.map 500 error", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
 
@@ -107,7 +148,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("retries without flavorId after two captionsAsArray.map failures", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
 
@@ -135,7 +176,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("does not retry when flavorId is absent (not the upstream bug path)", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -149,7 +190,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("adds a hint for JSON parse errors from upstream", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -164,7 +205,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("handles non-JSON upstream response when ok", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -179,7 +220,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("handles non-JSON upstream response when not ok", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(
@@ -194,7 +235,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("handles empty upstream response body", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(new Response("", { status: 200 }));
@@ -204,7 +245,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("returns 502 on a network / unexpected error", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockRejectedValue(new Error("Network failure"));
@@ -217,7 +258,7 @@ describe("POST /api/pipeline/generate-captions", () => {
   });
 
   it("ignores non-finite humorFlavorId values", async () => {
-    const supabase = createMockSupabase();
+    const supabase = createSupabaseForGenerateCaptions();
     supabase.auth.getSession.mockResolvedValue(mockSession() as any);
     mockCreateClient.mockResolvedValue(supabase as any);
     mockAlmostCrackdFetch.mockResolvedValue(makeUpstreamResponse({ data: ["Cap"] }));

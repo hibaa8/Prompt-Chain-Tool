@@ -178,6 +178,12 @@ export default function EditFlavorPage() {
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
+            <Link
+              href={`/humor-flavors/${params.id}/test`}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition text-center"
+            >
+              Test
+            </Link>
             <button
               type="button"
               onClick={handleDelete}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import HumorFlavorsSearchableGrid from "./components/HumorFlavorsSearchableGrid";
 
 export default async function Dashboard() {
   const supabase = await createSupabaseServerClient();
@@ -43,43 +44,7 @@ export default async function Dashboard() {
       </div>
 
       {flavors && flavors.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {flavors.map((flavor: any) => (
-            <div
-              key={flavor.id}
-              className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-800 hover:border-blue-500 dark:hover:border-blue-500 transition"
-            >
-              <Link href={`/humor-flavors/${flavor.id}/captions`} className="block">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                  {flavor.name || flavor.slug || `Flavor #${flavor.id}`}
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-                  {flavor.description || "No description"}
-                </p>
-              </Link>
-              <div className="flex gap-2 flex-wrap">
-                <Link
-                  href={`/humor-flavors/${flavor.id}`}
-                  className="flex-1 min-w-[4rem] bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-center transition text-sm"
-                >
-                  Edit
-                </Link>
-                <Link
-                  href={`/humor-flavors/${flavor.id}/test`}
-                  className="flex-1 min-w-[4rem] bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 px-3 rounded text-center transition text-sm"
-                >
-                  Test
-                </Link>
-                <Link
-                  href={`/humor-flavors/${flavor.id}/duplicate`}
-                  className="flex-1 min-w-[4rem] bg-violet-600 hover:bg-violet-700 text-white font-bold py-1.5 px-3 rounded text-center transition text-sm"
-                >
-                  Duplicate
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+        <HumorFlavorsSearchableGrid flavors={flavors} />
       ) : (
         <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-8 text-center">
           <p className="text-gray-600 dark:text-gray-400 mb-4">

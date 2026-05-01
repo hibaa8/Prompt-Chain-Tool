@@ -1,22 +1,23 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
-  const router = useRouter();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const isLoginPage = pathname === "/login";
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleLogout = async () => {
-    await fetch("/auth/logout", { method: "POST" });
-    router.push("/login");
+  const handleLogout = () => {
+    // Full navigation so Set-Cookie from signOut is applied (not a fetch + client redirect).
+    window.location.href = "/auth/logout";
   };
 
   if (!mounted) return null;
@@ -38,12 +39,14 @@ export default function Navbar() {
             >
               {theme === "dark" ? "☀️" : "🌙"}
             </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-            >
-              Logout
-            </button>
+            {!isLoginPage && (
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                Logout
+              </button>
+            )}
           </div>
         </div>
       </div>

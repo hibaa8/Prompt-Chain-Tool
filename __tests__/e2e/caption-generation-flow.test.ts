@@ -51,6 +51,7 @@ function buildSupabase() {
       if (table === "captions") {
         return {
           select: jest.fn().mockReturnThis(),
+          insert: jest.fn().mockResolvedValue({ data: null, error: null }),
           order: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           limit: jest.fn().mockResolvedValue({ data: existingCaptions, error: null }),
